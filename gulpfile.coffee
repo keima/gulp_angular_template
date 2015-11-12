@@ -1,14 +1,16 @@
 gulp = require 'gulp'
 $ = require('gulp-load-plugins')() # injecting gulp-* plugin
 browserSync = require 'browser-sync'
-bowerFiles = require "main-bower-files"
 runSequence = require 'run-sequence'
 rimraf = require "rimraf"
+source = require 'vinyl-source-stream'
+browserify = require 'browserify'
 
 # config
 config =
   dir: './app/'
   index: './app/index.html'
+  vendorjs: './app/vendor.js'
   js: './app/js/**/*.js'
   css: './app/css/**/*.css'
   partials: './app/partials/**/*.html'
@@ -29,12 +31,16 @@ gulp.task 'watch', ->
   gulp.watch config.css, ['inject', browserSync.reload]
 
 gulp.task 'inject', ->
-  bower = gulp.src bowerFiles(), {read: false}
   sources = gulp.src [config.js, config.css], {read: false}
 
   gulp.src config.index
-  .pipe $.inject bower, {ignorePath: 'app', addRootSlash: false, name: 'bower'}
   .pipe $.inject sources, {ignorePath: 'app', addRootSlash: false}
+  .pipe gulp.dest config.dir
+
+gulp.task 'browserify', ->
+  browserify entries: [config.vendorjs]
+  .bundle()
+  .pipe source 'vendor.build.js'
   .pipe gulp.dest config.dir
 
 gulp.task 'usemin', ->
@@ -62,9 +68,9 @@ gulp.task 'clean', (cb) ->
   rimraf(config.output, cb);
 
 
-gulp.task 'default', ['browser-sync', 'watch']
+gulp.task 'default', (cb) ->
+  runSequence 'browserify', 'browser-sync', 'watch', cb
 
-gulp.task 'build', (cb) -> runSequence(
-  'clean', 'inject', 'usemin', 'copy'
-  cb
-)
+gulp.task 'build', (cb) ->
+  runSequence 'clean', 'inject', 'usemin', 'copy', cb
+

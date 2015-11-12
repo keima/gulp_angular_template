@@ -2,3 +2,4 @@
 node_modules/
 app/bower_components/
 dist/
+vendor.build.js
