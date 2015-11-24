@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
 
-  <!-- #REMOVE_IT_IF_NEEDED#build:vendorcss vendor.css -->
-  <!-- endbuild -->
+  <!-- _build:vendorcss -->
+  <!-- _endbuild -->
 
-  <!-- #REMOVE_IT_IF_NEEDED#build:css style.css -->
+  <!-- build:css -->
   <!-- inject:css -->
+  <link rel="stylesheet" href="css/dummy.css">
   <!-- endinject -->
   <!-- endbuild -->
 
@@ -17,11 +18,11 @@
 </head>
 <body ng-app="myApp">
 
-<!-- build:vendorjs vendor.js -->
+<!-- build:vendorjs -->
 <script src="./vendor.build.js"></script>
 <!-- endbuild -->
 
-<!-- build:js app.js -->
+<!-- build:js -->
 <!-- inject:js -->
 <script src="js/app.js"></script>
 <script src="js/constant.js"></script>

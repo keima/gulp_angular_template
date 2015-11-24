@@ -1,6 +1,6 @@
 gulp = require 'gulp'
 $ = require('gulp-load-plugins')() # injecting gulp-* plugin
-browserSync = require 'browser-sync'
+browserSync = require('browser-sync').create()
 runSequence = require 'run-sequence'
 rimraf = require "rimraf"
 source = require 'vinyl-source-stream'
@@ -16,19 +16,22 @@ config =
   partials: './app/partials/**/*.html'
   copy: []
   output: './dist/'
+  isWatching: false
 
 #
 # Task
 #
 gulp.task 'browser-sync', ->
-  browserSync server:
-    baseDir: config.dir
+  browserSync.init server: config.dir
 # for GAE Proxy
 # browserSync proxy: 'localhost:8080'
 
+gulp.task 'bs-reload', ->
+  browserSync.reload()
+
 gulp.task 'watch', ->
-  gulp.watch config.js, ['inject', browserSync.reload]
-  gulp.watch config.css, ['inject', browserSync.reload]
+  gulp.watch config.js, ['inject', 'bs-reload']
+  gulp.watch config.css, ['inject', 'bs-reload']
 
 gulp.task 'inject', ->
   sources = gulp.src [config.js, config.css], {read: false}
@@ -38,21 +41,68 @@ gulp.task 'inject', ->
   .pipe gulp.dest config.dir
 
 gulp.task 'browserify', ->
-  browserify entries: [config.vendorjs]
-  .bundle()
-  .pipe source 'vendor.build.js'
-  .pipe gulp.dest config.dir
+  b = browserify
+    entries: [config.vendorjs]
+    cache: {}
+    packageCache: {}
+    debug: true
+
+  if config.isWatching
+    b.plugin(watchify)
+
+  bundle = ->
+    b.bundle()
+    .pipe source 'vendor.build.js'
+    .pipe gulp.dest config.output
+
+  if config.isWatching
+    b.on "update", bundle
+    b.on "log", (msg) ->
+      console.log(msg)
+
+  bundle()
 
 gulp.task 'usemin', ->
+  cssTask = (files, filename) ->
+    if files?
+      files.pipe $.pleeease(
+#      import: {path: ["dist/bower_components/onsenui/build/css","app/bower_components/onsenui/build/css"]}
+        autoprefixer: {browsers: ["last 4 versions", "ios 6", "android 4.0"]}
+#      rebaseUrls: false
+        out: config.output + filename
+      )
+      .pipe $.concat(filename)
+      .pipe $.rev()
+
+  jsTask = (files, filename) ->
+    if files?
+      files.pipe $.ngAnnotate()
+      .pipe $.uglify()
+      .pipe $.concat(filename)
+      .pipe $.rev()
+
   gulp.src config.index
-  .pipe $.usemin(
-    html: [$.minifyHtml(empty: true, conditionals: true)]
-    vendorcss: [$.minifyCss(), $.rev()]
-    css: [$.minifyCss(), $.rev()]
-    vendorjs: [$.ngAnnotate(), $.uglify(), $.rev()]
-    js: [$.ngAnnotate(), $.uglify(), $.rev()]
-  )
+  .pipe $.spa.html
+    assetsDir: config.dir
+    pipelines:
+      main: (files)->
+        files.pipe $.minifyHtml(empty: true, conditionals: true)
+      vendorjs: (files)->
+        jsTask files, "vendor.js"
+      js: (files)->
+        jsTask files, "app.js"
+      vendorcss: (files)->
+        cssTask files, "vendor.css"
+      css: (files)->
+        cssTask files, "app.css"
   .pipe gulp.dest(config.output)
+
+gulp.task 'imagemin', ->
+  gulp.src config.image, {base: config.dir}
+  .pipe $.imagemin({
+    progressive: true
+  })
+  .pipe gulp.dest config.output
 
 gulp.task 'copy', ->
   gulp.src config.partials, {base: config.dir}
@@ -63,14 +113,15 @@ gulp.task 'copy', ->
   gulp.src config.copy, {base: config.dir}
   .pipe gulp.dest config.output
 
-
 gulp.task 'clean', (cb) ->
   rimraf(config.output, cb);
 
+gulp.task 'setWatch', ->
+  config.isWatching = true
 
 gulp.task 'default', (cb) ->
   runSequence 'browserify', 'browser-sync', 'watch', cb
 
 gulp.task 'build', (cb) ->
-  runSequence 'clean', 'inject', 'usemin', 'copy', cb
+  runSequence 'clean', 'inject', 'usemin', 'copy', 'imagemin', cb
 
